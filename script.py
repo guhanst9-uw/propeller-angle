@@ -71,7 +71,7 @@ def base_frame(coords, btype):
     # check if we have the required atoms
     required_ring_atoms = [atom for atom in RING_ATOMS[btype] if atom in coords]
     if len(required_ring_atoms) < 4:
-        raise ValueError(f"Insufficient ring atoms: only found {required_ring_atoms}")
+        raise ValueError(f"Not enough ring atoms: only found {required_ring_atoms}")
     
     if SUGAR_ATOM not in coords:
         raise ValueError(f"Missing sugar atom: {SUGAR_ATOM}")
