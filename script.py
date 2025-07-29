@@ -3,7 +3,7 @@ import numpy as np
 # all ring atoms per base type
 RING_ATOMS = {
     'purine':     ['N9','C8','N7','C5','C4','N3','C2','N1'],
-    'pyrimidine': ['N1','C2','N3','C4','C5','C6'] # removed O2 as it's not always present 
+    'pyrimidine': ['N1','C2','N3','C4','C5','C6', 'O2'] 
 }
 SUGAR_ATOM = "C1'"
 REF_ATOM = {'purine':'C8','pyrimidine':'C6'}
@@ -71,7 +71,7 @@ def base_frame(coords, btype):
     # check if we have the required atoms
     required_ring_atoms = [atom for atom in RING_ATOMS[btype] if atom in coords]
     if len(required_ring_atoms) < 4:
-        raise ValueError(f"Not enough ring atoms: only found {required_ring_atoms}")
+        raise ValueError(f"Insufficient ring atoms: only found {required_ring_atoms}")
     
     if SUGAR_ATOM not in coords:
         raise ValueError(f"Missing sugar atom: {SUGAR_ATOM}")
@@ -99,12 +99,15 @@ def base_frame(coords, btype):
     return center, y, z
 
 def torsion(z1, z2, axis):
-    # signed torsion of z2→z1 about axis
-    b2 = axis / np.linalg.norm(axis)
-    n1 = np.cross(axis, z2) # note swap: z2→z1
-    n2 = np.cross(axis, z1)
-    x = np.dot(n1, n2)
-    y = np.dot(np.cross(n1, n2), b2)
+    axis = axis / np.linalg.norm(axis)
+    z1_proj = z1 - np.dot(z1, axis) * axis
+    z2_proj = z2 - np.dot(z2, axis) * axis
+    z1_proj /= np.linalg.norm(z1_proj)
+    z2_proj /= np.linalg.norm(z2_proj)
+
+    x = np.dot(z1_proj, z2_proj)
+    y = np.dot(np.cross(z2_proj, z1_proj), axis)  # flipped cross order here
+
     return np.degrees(np.arctan2(y, x))
 
 def normalize_propeller(phi):
@@ -118,12 +121,22 @@ def normalize_propeller(phi):
 def calculate_propeller_angle(f1, f2):
     _, y1, z1 = f1
     _, y2, z2 = f2
+
     # flip if y-axes disagree
     if np.dot(y1, y2) < 0:
         y2 = -y2
         z2 = -z2
-    axis = (y1 + y2)
+
+    axis = y1 + y2
+    if np.linalg.norm(axis) < 1e-8:
+        axis = y1  # fallback if vectors nearly opposite
     axis /= np.linalg.norm(axis)
+    
+    # force axis direction from base1 to base2 (optional)
+    # flip axis if dot with y1 is negative to keep consistent direction
+    if np.dot(axis, y1) < 0:
+        axis = -axis
+
     raw = torsion(z1, z2, axis)
     return normalize_propeller(raw)
 
